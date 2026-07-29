@@ -1,7 +1,9 @@
 # electron-builder 打包配置（08 章 §2 打包与部署）。
 #
 # 核心取舍：
-# - NSIS oneClick + perMachine:false → 装到 %LOCALAPPDATA%\Programs，UAC 不弹窗、免管理员。
+# - NSIS 向导式（oneClick:false）+ 可选安装目录 + perMachine:false → 默认装到
+#   %LOCALAPPDATA%\Programs（该路径免管理员、不弹 UAC）；用户可改装到 D 盘等
+#   自定义目录，仅当目标目录需要提权时才会弹一次 UAC（allowElevation）。
 #   VC++ CRT DLL 随 PyInstaller onedir 一起带，不跑需要管理员权限的 vc_redist。
 # - publish 置空：离线产品不允许存在任何自动更新/发布上传通道（02 章 §7）。
 # - 引擎以 extraResources 打进 resources\engine\，主进程按
@@ -58,10 +60,12 @@ win:
   # M5 随代码签名一并接入（签名必须在清单注入之后做，否则签名会失效）。
 
 nsis:
-  oneClick: true
+  # 向导式安装：用户可自选安装目录（默认 %LOCALAPPDATA%\Programs\DocFactory）。
+  # 默认路径不需要提权；只有用户选择受保护目录（如 Program Files）时才提升。
+  oneClick: false
   perMachine: false
-  allowElevation: false
-  allowToChangeInstallationDirectory: false
+  allowElevation: true
+  allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: DocFactory
@@ -69,11 +73,9 @@ nsis:
   # 用户数据（%LOCALAPPDATA%\DocFactory）默认保留，卸载不静默删数据
   deleteAppDataOnUninstall: false
   differentialPackage: false
-  # TODO(M5)：卸载器询问「是否保留解析数据」（02 章 §3 卸载策略）。
-  # 做法：新增 build/installer.nsh，实现 customUnInstall 宏 —— MessageBox 询问，
-  # 选「否」才 RMDir /r "$LOCALAPPDATA\DocFactory"，默认保留并提示目录位置。
-  # 脚本落地后在此启用：
-  # include: build/installer.nsh
+  # 卸载策略（02 章 §3）：customUnInstall 宏 —— 卸载时询问是否删除解析数据，
+  # 默认保留并提示目录位置；升级触发的旧版卸载（isUpdated）不问不删。
+  include: build/installer.nsh
 
 compression: maximum
 # 只保留中英文语言包，砍掉 Electron 自带的其余 locale（体积清单见 08 章 §2）
