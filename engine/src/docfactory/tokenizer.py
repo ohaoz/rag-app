@@ -130,17 +130,21 @@ def reset_cache() -> None:
 
 @lru_cache(maxsize=1)
 def _default_models_dir() -> Path | None:
-    """没人调用过 configure_models_dir 时的兜底目录：标准数据目录下的 models\\。
+    """没人调用过 configure_models_dir 时的兜底目录：优先内置 resources/models，其次数据根 models\\。
 
     为什么需要它：``count_tokens`` 的签名里没有 paths，而调用方分两类 —— rechunk 任务
     会先调 configure_models_dir，解析流水线却是直接调 chunk_document（拿不到 paths）。
     若不兜底，同一篇文档「解析时切」和「重切」会落到两套 token 口径上，token_count 前后
-    对不上。这里按 02 章 §3 的固定布局自行推出目录（只读本地路径，不触网）。
+    对不上。这里经 resources.find_models_dir 统一解析（内置随包模型优先，M2 §Phase 0），
+    与 rechunk 路径同源；都找不到时仍回退数据根 models\\（load_local_tokenizer 会优雅地
+    找不到文件→启发式）。只读本地路径，不触网（硬约束 3）。
     """
     try:
         from docfactory.config import Paths, default_data_root
+        from docfactory.resources import find_models_dir
 
-        return Paths(root=default_data_root()).models
+        data_models = Paths(root=default_data_root()).models
+        return find_models_dir(data_models) or data_models
     except Exception:
         return None
 

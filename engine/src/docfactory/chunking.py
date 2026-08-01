@@ -37,6 +37,7 @@ from pydantic import ValidationError
 from docfactory.config import ChunkSettings
 from docfactory.errors import DocFactoryError
 from docfactory.ir import IRDocument, IRNode, TableContent, table_has_merged_cells, table_to_grid
+from docfactory.resources import find_models_dir
 from docfactory.taskspec import (
     EVENT_PROGRESS,
     EVENT_STAGE_CHANGE,
@@ -230,7 +231,9 @@ def run_rechunk(ctx: TaskContext) -> TaskOutcome:
     if not ir_path.is_file():
         raise DocFactoryError("E05", f"未找到该文档的解析结果（{ir_path.name}），请先重新解析")
 
-    configure_models_dir(ctx.paths.models)     # token 计数优先用本地 Qwen tokenizer
+    # token 计数优先用本地 Qwen tokenizer：内置 resources/models 优先，无则回退数据根 models/
+    # （与解析流水线的 tokenizer._default_models_dir 同源，保证「解析时切」与「重切」口径一致）
+    configure_models_dir(find_models_dir(ctx.paths.models) or ctx.paths.models)
     cs = _merge_chunk_settings(ctx.settings.chunk, ctx.payload.get("chunk"))
 
     ctx.progress(EVENT_STAGE_CHANGE, {"stage": "chunk"})
