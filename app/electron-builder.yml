@@ -42,6 +42,24 @@ extraResources:
     to: engine
     filter:
       - "**/*"
+  # ⬇️ M2 §Phase 0 随包基础模型（详见 docs/M2-实施计划.md）。**已启用**（Qwen tokenizer）。
+  #   模型不入库（见 engine/resources/.gitignore），由构建期脚本产出到 engine/resources/models/：
+  #     本地出包前先 `cd engine && uv run python scripts/fetch_models.py`；
+  #     CI 由 engine job 下载并作为 engine-models artifact 传给 package job（见 ci.yml）。
+  #   刻意**不走 PyInstaller datas**（会撑大 onedir、拖慢 analysis），在此与引擎目录并列进包；
+  #   引擎运行期经 resources.find_models_dir() 定位（内置 resources/models 优先）。
+  - from: ../engine/resources/models
+    to: models
+    filter:
+      - "**/*"
+  # ⬇️ M2 §Phase 1 裁剪版 LibreOffice（~300MB，**仍注释**：二进制尚未产出，取消注释会让
+  #   electron-builder 报「源目录不存在」而中断出包——与上面 icon 同款「文件就位后再启用」约定）。
+  #   就位后同时：① 取消注释；② 在 ci.yml package job 体积门禁补 soffice.exe 存在性校验。
+  #   引擎侧定位已就绪：parsers/office_convert.find_soffice()（resources/libreoffice/program/soffice.exe）。
+  # - from: ../engine/resources/libreoffice
+  #   to: libreoffice
+  #   filter:
+  #     - "**/*"
 
 win:
   target:

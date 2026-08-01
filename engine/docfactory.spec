@@ -19,11 +19,24 @@
   代价只是几百 KB。
 """
 
-from PyInstaller.utils.hooks import collect_data_files, collect_submodules
+from PyInstaller.utils.hooks import (
+    collect_data_files,
+    collect_dynamic_libs,
+    collect_submodules,
+)
 
 # 延迟 import 的模块全部显式收进来（见上方说明）
 hiddenimports = collect_submodules("docfactory") + collect_submodules("uvicorn")
 hiddenimports += ["sse_starlette"]
+
+# tokenizers（Qwen 本地分词器，M2 §Phase 0/4）：tokenizer.py 里是**惰性** import
+# （``from tokenizers import Tokenizer`` 藏在函数体内、且包在 try/except ImportError 里），
+# PyInstaller 的静态扫描一个都看不见。不显式收进来，打包产物会**静默退回启发式估算**——
+# 装了随包 tokenizer.json 也用不上，且没有任何报错提示。
+# huggingface_hub 是 tokenizers 声明的依赖，但**只有 from_pretrained 才用到**；本工程只走
+# from_file（离线纪律），实测 ``import tokenizers`` 不会拉起 huggingface_hub，故无需收它
+# （PyInstaller 也已判定其不可达而剪除，onedir 里确认没有它，from_file 照常工作）。
+hiddenimports += collect_submodules("tokenizers")
 
 # 引擎**自己**的包内数据：SQLite 迁移脚本。db._load_migrations 走
 # ``importlib.resources.files("docfactory") / "migrations"`` 读它，而 PyInstaller 只收 .py，
@@ -40,10 +53,14 @@ datas += (
     + collect_data_files("pdfminer")
 )
 
+# tokenizers 是 Rust 扩展：光收 Python 子模块不够，编译出的 .pyd 要靠 collect_dynamic_libs
+# 显式带上，否则打包产物 import 时报「找不到 _tokenizers」。
+binaries = collect_dynamic_libs("tokenizers")
+
 a = Analysis(
     ["src/docfactory/main.py"],
     pathex=["src"],
-    binaries=[],
+    binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],

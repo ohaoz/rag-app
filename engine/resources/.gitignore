@@ -1,0 +1,6 @@
+# 随包资源（Qwen tokenizer / layout / TableFormer / OCR 模型、裁剪版 LibreOffice）
+# 由构建期脚本下载/准备（scripts/fetch_models.py 等），体积大且可重建，一律不入库。
+# 引擎运行期经 resources.find_models_dir() / office_convert.find_soffice() 定位这里。
+# 见 docs/M2-实施计划.md §Phase 0/1。
+*
+!.gitignore

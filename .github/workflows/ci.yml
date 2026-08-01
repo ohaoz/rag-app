@@ -82,6 +82,19 @@ jobs:
           # 几百 MB 的中间产物，留够排障即可，别长期占存储配额
           retention-days: 3
 
+      - name: 准备随包基础模型（M2 §Phase 0）
+        # 模型不入库（engine/resources/.gitignore），构建期下载到 engine/resources/models/；
+        # package job 取它随包（electron-builder.yml 的 extraResources → resources/models）。
+        # 下载失败即构建失败：随包模型缺失 = 产物不完整，不能静默放行。
+        run: uv run python scripts/fetch_models.py
+
+      - name: 上传随包模型（供 package job 随包）
+        uses: actions/upload-artifact@v4
+        with:
+          name: engine-models
+          path: engine/resources/models
+          retention-days: 3
+
       - name: golden corpus 回归（解析质量门禁）
         # --generate 造出程序化 fixtures：CI 不依赖任何入库的真实语料就能跑最小回归集
         run: uv run python ../corpus/run_corpus.py --generate --report ../corpus/report.md
@@ -150,6 +163,14 @@ jobs:
           name: engine-onedir
           path: engine/dist/engine
 
+      - name: 取随包基础模型（M2 §Phase 0）
+        # 与 engine job 上传时的布局逐字对上；electron-builder.yml 的 extraResources
+        # 指向 ../engine/resources/models，缺了体积门禁会报「安装包内缺少随包模型」
+        uses: actions/download-artifact@v4
+        with:
+          name: engine-models
+          path: engine/resources/models
+
       - name: 出 NSIS 安装包
         run: npm run dist
 
@@ -167,6 +188,9 @@ jobs:
           # 署名义务门禁（03 章 §6）：第三方许可声明必须随包分发，缺了就是合规事故
           $notices = "dist/win-unpacked/resources/engine/THIRD-PARTY-NOTICES.txt"
           if (-not (Test-Path $notices)) { throw "安装包内缺少第三方许可声明：$notices" }
+          # 随包模型门禁（M2 §Phase 0）：Qwen tokenizer 必须随包，缺了打包产物会静默退回启发式估算
+          $tok = "dist/win-unpacked/resources/models/qwen-tokenizer/tokenizer.json"
+          if (-not (Test-Path $tok)) { throw "安装包内缺少随包模型：$tok" }
           if ($setup.Length -gt 2GB) { throw "安装包 $mb MB 超过 2GB 上限" }
 
       - name: 上传安装包
